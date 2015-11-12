@@ -1,0 +1,14 @@
+*.class
+*.project
+*.orig
+**/.classpath
+**/.factorypath
+.settings
+
+# Eclipse e Mvn #
+bin/
+build/
+target/
+metamodel/
+
+# Dados para testes #
