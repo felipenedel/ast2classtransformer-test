@@ -1,6 +1,5 @@
 package transformer;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +47,7 @@ import com.google.common.primitives.Primitives;
 
 public class AST2ClassTransformer {
 
+	// TODO Logger not working;
 	// TODO Remove print fields;
 	// TODO Add suport for interfaces, methods and superclasses;
 	// TODO Add suport for lists inside annotations;
@@ -85,19 +85,34 @@ public class AST2ClassTransformer {
 				String packageName = this.elementsUtil.getPackageOf(typeElement).toString();
 				this.classPool.makePackage(this.customClassLoader, packageName);
 				String elementClassName = typeElement.getSimpleName().toString();
-				CtClass ctClass = this.classPool.makeClass(packageName + "." + elementClassName);
+
+				CtClass ctClass;
+				try {
+					ctClass = this.classPool.get(packageName + "." + elementClassName);
+					ctClass.defrost();
+				} catch (Exception e) {
+					ctClass = this.classPool.makeClass(packageName + "." + elementClassName);
+				}
 
 				ClassFile classfile = ctClass.getClassFile();
 				this.constantPool = classfile.getConstPool();
 
 				for (VariableElement elementField : ElementFilter.fieldsIn(typeElement.getEnclosedElements())) {
 					CtField ctField = this.resolveCtField(ctClass, elementField.asType().toString(), elementField.getSimpleName().toString());
+
+					if (ctField == null) {
+						continue;
+					}
+
 					ctField.setModifiers(Modifier.PUBLIC);
 
 					List<? extends AnnotationMirror> annotationMirrors = this.elementsUtil.getAllAnnotationMirrors(elementField);
 					for (AnnotationMirror annotationMirror : annotationMirrors) {
 						AttributeInfo annotationsAttribute = this.extractAnnotationFromMirror(annotationMirror);
-						ctField.getFieldInfo().addAttribute(annotationsAttribute);
+
+						if (annotationsAttribute != null) {
+							ctField.getFieldInfo().addAttribute(annotationsAttribute);
+						}
 					}
 
 					ctClass.addField(ctField);
@@ -106,7 +121,7 @@ public class AST2ClassTransformer {
 				Class<?> createdClass = ctClass.toClass(this.customClassLoader, null);
 				createdClasses.add(createdClass);
 
-				this.printClassFields(createdClass);
+				// this.printClassFields(createdClass);
 			} catch (CannotCompileException e) {
 				log.warn("Cannot compile type element: " + typeElement.toString() + "\n" + e.getMessage());
 			} catch (NotFoundException e) {
@@ -129,15 +144,52 @@ public class AST2ClassTransformer {
 	 * @throws RuntimeException
 	 */
 	private CtField resolveCtField(CtClass ctClass, String fieldType, String fieldName) throws CannotCompileException, RuntimeException {
-		CtField ctField = null;
+		CtClass newFieldCtType = null;
 
 		try {
-			ctField = new CtField(this.classPool.get(fieldType), fieldName, ctClass);
+			// TODO Accept other parameterized types;
+			if (fieldType.contains("java.util.List")) {
+				newFieldCtType = this.classPool.get("java.util.List");
+			} else {
+				newFieldCtType = this.classPool.get(fieldType);
+			}
 		} catch (NotFoundException e) {
-			// log.warn("Field type should exist on ClassPool. Add it to the ClassLoader: " + fieldName + ": " + fieldType);
+			log.warn("Field type should exist on ClassPool. Add it to the ClassLoader: " + fieldName + ": " + fieldType);
+			log.warn("Will try to create a fake Class;");
+			newFieldCtType = this.classPool.makeClass(fieldType);
+			newFieldCtType.toClass();
 		}
 
+		CtField ctField = new CtField(newFieldCtType, fieldName, ctClass);
+
 		return ctField;
+	}
+
+	/**
+	 * Extract an {@link AttributeInfo} from the given annotation mirror;
+	 *
+	 * @param annotationMirror
+	 * @return
+	 * @throws NotFoundException
+	 * @throws CannotCompileException
+	 */
+	private AttributeInfo extractAnnotationFromMirror(AnnotationMirror annotationMirror) throws CannotCompileException, NotFoundException {
+		String annotationType = annotationMirror.getAnnotationType().toString();
+		Annotation annotation = this.resolveCtAnnotation(annotationType);
+
+		if (annotation == null) {
+			return null;
+		}
+
+		Map<? extends ExecutableElement, ? extends AnnotationValue> annotationValues = annotationMirror.getElementValues();
+		for (ExecutableElement annotationMemberName : annotationValues.keySet()) {
+			this.addMemberToAnnotation(annotation, annotationMemberName.getSimpleName().toString(), annotationValues.get(annotationMemberName));
+		}
+
+		AnnotationsAttribute annotationsAttribute = new AnnotationsAttribute(this.constantPool, AnnotationsAttribute.visibleTag);
+		annotationsAttribute.addAnnotation(annotation);
+
+		return annotationsAttribute;
 	}
 
 	/**
@@ -156,32 +208,10 @@ public class AST2ClassTransformer {
 			ctAnnotation = this.classPool.get(annotationType);
 		} catch (Exception e) {
 			log.warn("Annotation type should exist on ClassPool. Add it to the ClassLoader: " + annotationType);
+			return null;
 		}
 
 		return new Annotation(this.constantPool, ctAnnotation);
-	}
-
-	/**
-	 * Extract an {@link AttributeInfo} from the given annotation mirror;
-	 *
-	 * @param annotationMirror
-	 * @return
-	 * @throws NotFoundException
-	 * @throws CannotCompileException
-	 */
-	private AttributeInfo extractAnnotationFromMirror(AnnotationMirror annotationMirror) throws CannotCompileException, NotFoundException {
-		String annotationType = annotationMirror.getAnnotationType().toString();
-		Annotation annotation = this.resolveCtAnnotation(annotationType);
-
-		Map<? extends ExecutableElement, ? extends AnnotationValue> annotationValues = annotationMirror.getElementValues();
-		for (ExecutableElement annotationMemberName : annotationValues.keySet()) {
-			this.addMemberToAnnotation(annotation, annotationMemberName.getSimpleName().toString(), annotationValues.get(annotationMemberName));
-		}
-
-		AnnotationsAttribute annotationsAttribute = new AnnotationsAttribute(this.constantPool, AnnotationsAttribute.visibleTag);
-		annotationsAttribute.addAnnotation(annotation);
-
-		return annotationsAttribute;
 	}
 
 	/**
@@ -200,7 +230,10 @@ public class AST2ClassTransformer {
 		if (annotationValue instanceof String) {
 			memberValue = new StringMemberValue((String) annotationValue, this.constantPool);
 		} else if (annotationValue instanceof TypeMirror) {
-			memberValue = new ClassMemberValue(annotationValue.toString(), this.constantPool);
+			String className = annotationValue.toString();
+			this.classPool.makeClass(className); // FIXME Remove this zueira;
+
+			memberValue = new ClassMemberValue(className, this.constantPool);
 		} else if (Primitives.isWrapperType(annotationValue.getClass())) {
 			memberValue = this.createPrimitiveMemberValue(annotationValue);
 		} else if (annotationValue instanceof VariableElement) {
@@ -217,8 +250,11 @@ public class AST2ClassTransformer {
 				AnnotationMirror annotationMirror = (AnnotationMirror) object;
 
 				AnnotationsAttribute attributeInfo = (AnnotationsAttribute) this.extractAnnotationFromMirror(annotationMirror);
-				Annotation[] annotations = attributeInfo.getAnnotations();
+				if (attributeInfo == null) {
+					continue;
+				}
 
+				Annotation[] annotations = attributeInfo.getAnnotations();
 				for (int index = 0; index < annotations.length; index++) {
 					membersSemNome.add(new AnnotationMemberValue(annotations[index], this.constantPool));
 				}
@@ -227,11 +263,11 @@ public class AST2ClassTransformer {
 			arrayMemberValue.setValue(membersSemNome.toArray(new MemberValue[0]));
 			memberValue = arrayMemberValue;
 		} else {
-			// log.warn("Can't handle type: " + annotationMemberValue.getValue());
+			log.warn("Can't handle type: " + annotationMemberValue.getValue());
 		}
 
 		if (memberValue == null) {
-			// log.warn("Couldn't resolve type: " + annotationMemberValue.getValue());
+			log.warn("Couldn't resolve type: " + annotationMemberValue.getValue());
 			return;
 		}
 
@@ -268,20 +304,20 @@ public class AST2ClassTransformer {
 		return memberValue;
 	}
 
-	private void printClassFields(Class<?> translatedClass) {
-		System.out.println();
-		java.lang.annotation.Annotation[] annotations = translatedClass.getAnnotations();
-		for (int i = 0; i < annotations.length; i++) {
-			System.out.println(annotations[i]);
-		}
-		Field[] fields = translatedClass.getFields();
-		for (int i = 0; i < fields.length; i++) {
-			System.out.print(fields[i] + ": ");
-			java.lang.annotation.Annotation[] annotations2 = fields[i].getAnnotations();
-			for (int j = 0; j < annotations2.length; j++) {
-				System.out.print(annotations2[j].toString() + "; ");
-			}
-			System.out.println();
-		}
-	}
+	// private void printClassFields(Class<?> translatedClass) {
+	// System.out.println();
+	// java.lang.annotation.Annotation[] annotations = translatedClass.getAnnotations();
+	// for (int i = 0; i < annotations.length; i++) {
+	// System.out.println(annotations[i]);
+	// }
+	// Field[] fields = translatedClass.getFields();
+	// for (int i = 0; i < fields.length; i++) {
+	// System.out.print(fields[i] + ": ");
+	// java.lang.annotation.Annotation[] annotations2 = fields[i].getAnnotations();
+	// for (int j = 0; j < annotations2.length; j++) {
+	// System.out.print(annotations2[j].toString() + "; ");
+	// }
+	// System.out.println();
+	// }
+	// }
 }
