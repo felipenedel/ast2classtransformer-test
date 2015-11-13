@@ -16,6 +16,9 @@ import org.slf4j.LoggerFactory;
 
 public class AST2ClassInitializer {
 
+	// TODO Analisar consequências;
+	// TODO Javadoc;
+
 	private static final Logger log = LoggerFactory.getLogger(AST2ClassInitializer.class);
 
 	public ClassPool initializeClassPool(List<Class<?>> classes) {

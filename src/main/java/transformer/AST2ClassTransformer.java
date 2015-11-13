@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javassist.CannotCompileException;
 import javassist.ClassPool;
@@ -32,6 +33,7 @@ import javassist.bytecode.annotation.StringMemberValue;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -46,6 +48,10 @@ import com.google.common.primitives.Primitives;
 
 public class AST2ClassTransformer {
 
+	// TODO Remove print fields;
+	// TODO Add suport for interfaces, methods and superclasses;
+	// TODO Add suport for lists inside annotations;
+
 	private static final Logger log = LoggerFactory.getLogger(AST2ClassTransformer.class);
 
 	ConstPool constantPool;
@@ -54,7 +60,7 @@ public class AST2ClassTransformer {
 	ClassPool classPool;
 	ClassLoader customClassLoader;
 
-	public AST2ClassTransformer(Elements elementsUtil, ClassLoader classLoader, ClassPool classPool) throws NotFoundException {
+	public AST2ClassTransformer(Elements elementsUtil, ClassLoader classLoader, ClassPool classPool) {
 		this.elementsUtil = elementsUtil;
 		this.customClassLoader = classLoader;
 		this.classPool = classPool;
@@ -63,16 +69,18 @@ public class AST2ClassTransformer {
 	/**
 	 * Process this list of {@link TypeElement} and returns a list of converted classes;
 	 *
-	 * @param typeElements
+	 * @param elements
 	 * @return
 	 * @throws CannotCompileException
 	 * @throws RuntimeException
 	 * @throws NotFoundException
 	 */
-	public List<Class<?>> processTypeElements(List<TypeElement> typeElements) {
+	public List<Class<?>> processTypeElements(Set<? extends Element> elements) {
 		List<Class<?>> createdClasses = new ArrayList<>();
 
-		for (TypeElement typeElement : typeElements) {
+		for (Element element : elements) {
+			TypeElement typeElement = (TypeElement) element;
+
 			try {
 				String packageName = this.elementsUtil.getPackageOf(typeElement).toString();
 				this.classPool.makePackage(this.customClassLoader, packageName);

@@ -6,6 +6,9 @@ import java.util.regex.Pattern;
 
 public class ClassURLGetter {
 
+	// TODO Refact code;
+	// TODO Javadoc;
+
 	public static URL getClassContainer(Class<?> clazz) throws Exception {
 		if (clazz == null) {
 			throw new NullPointerException("Cant't parse null Class");
