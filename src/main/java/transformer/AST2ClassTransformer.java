@@ -48,46 +48,65 @@ public class AST2ClassTransformer {
 
 	private static final Logger log = LoggerFactory.getLogger(AST2ClassTransformer.class);
 
-	Elements elementsUtil;
-	TypeElement typeElement;
-	ClassPool defaultClassPool;
-	ClassPool classPool;
 	ConstPool constantPool;
-	// CustomClassLoader customClassLoader;
+
+	Elements elementsUtil;
+	ClassPool classPool;
 	ClassLoader customClassLoader;
 
-	public AST2ClassTransformer(TypeElement typeElement, Elements elementsUtil, ClassLoader classLoader, ClassPool classPool) throws NotFoundException {
-		this.typeElement = typeElement;
+	public AST2ClassTransformer(Elements elementsUtil, ClassLoader classLoader, ClassPool classPool) throws NotFoundException {
 		this.elementsUtil = elementsUtil;
 		this.customClassLoader = classLoader;
 		this.classPool = classPool;
 	}
 
-	public void processElement() throws CannotCompileException, RuntimeException, NotFoundException {
-		String packageName = this.elementsUtil.getPackageOf(this.typeElement).toString();
-		this.classPool.makePackage(this.customClassLoader, packageName);
-		String elementClassName = this.typeElement.getSimpleName().toString();
-		CtClass ctClass = this.classPool.makeClass(packageName + "." + elementClassName);
+	/**
+	 * Process this list of {@link TypeElement} and returns a list of converted classes;
+	 *
+	 * @param typeElements
+	 * @return
+	 * @throws CannotCompileException
+	 * @throws RuntimeException
+	 * @throws NotFoundException
+	 */
+	public List<Class<?>> processTypeElements(List<TypeElement> typeElements) {
+		List<Class<?>> createdClasses = new ArrayList<>();
 
-		ClassFile classfile = ctClass.getClassFile();
-		this.constantPool = classfile.getConstPool();
+		for (TypeElement typeElement : typeElements) {
+			try {
+				String packageName = this.elementsUtil.getPackageOf(typeElement).toString();
+				this.classPool.makePackage(this.customClassLoader, packageName);
+				String elementClassName = typeElement.getSimpleName().toString();
+				CtClass ctClass = this.classPool.makeClass(packageName + "." + elementClassName);
 
-		for (VariableElement elementField : ElementFilter.fieldsIn(this.typeElement.getEnclosedElements())) {
-			CtField ctField = this.resolveCtField(ctClass, elementField.asType().toString(), elementField.getSimpleName().toString());
-			ctField.setModifiers(Modifier.PUBLIC);
+				ClassFile classfile = ctClass.getClassFile();
+				this.constantPool = classfile.getConstPool();
 
-			List<? extends AnnotationMirror> annotationMirrors = this.elementsUtil.getAllAnnotationMirrors(elementField);
-			for (AnnotationMirror annotationMirror : annotationMirrors) {
-				AttributeInfo annotationsAttribute = this.extractAnnotationFromMirror(annotationMirror);
-				ctField.getFieldInfo().addAttribute(annotationsAttribute);
+				for (VariableElement elementField : ElementFilter.fieldsIn(typeElement.getEnclosedElements())) {
+					CtField ctField = this.resolveCtField(ctClass, elementField.asType().toString(), elementField.getSimpleName().toString());
+					ctField.setModifiers(Modifier.PUBLIC);
+
+					List<? extends AnnotationMirror> annotationMirrors = this.elementsUtil.getAllAnnotationMirrors(elementField);
+					for (AnnotationMirror annotationMirror : annotationMirrors) {
+						AttributeInfo annotationsAttribute = this.extractAnnotationFromMirror(annotationMirror);
+						ctField.getFieldInfo().addAttribute(annotationsAttribute);
+					}
+
+					ctClass.addField(ctField);
+				}
+
+				Class<?> createdClass = ctClass.toClass(this.customClassLoader, null);
+				createdClasses.add(createdClass);
+
+				this.printClassFields(createdClass);
+			} catch (CannotCompileException e) {
+				log.warn("Cannot compile type element: " + typeElement.toString() + "\n" + e.getMessage());
+			} catch (NotFoundException e) {
+				log.warn("Not found: " + typeElement.toString() + "\n" + e.getMessage());
 			}
-
-			ctClass.addField(ctField);
 		}
 
-		Class<?> translatedClass = ctClass.toClass(this.customClassLoader, null);
-
-		this.printClassFields(translatedClass);
+		return createdClasses;
 	}
 
 	/**

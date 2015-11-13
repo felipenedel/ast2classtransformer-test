@@ -14,11 +14,9 @@ import javassist.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import transformer.utils.StringUtils;
+public class AST2ClassInitializer {
 
-public class UtilsRefactorName {
-
-	private static final Logger log = LoggerFactory.getLogger(AST2ClassTransformer.class);
+	private static final Logger log = LoggerFactory.getLogger(AST2ClassInitializer.class);
 
 	public ClassPool initializeClassPool(List<Class<?>> classes) {
 		ClassPool classPool = ClassPool.getDefault();
@@ -44,7 +42,7 @@ public class UtilsRefactorName {
 
 		for (Class<?> clazz : classes) {
 			try {
-				URL classContainer = StringUtils.getClassContainer(clazz);
+				URL classContainer = ClassURLGetter.getClassContainer(clazz);
 				urls.add(classContainer);
 			} catch (Exception e) {
 				log.error(e.getMessage());

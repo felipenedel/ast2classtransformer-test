@@ -1,10 +1,10 @@
-package transformer.utils;
+package transformer;
 
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.regex.Pattern;
 
-public class StringUtils {
+public class ClassURLGetter {
 
 	public static URL getClassContainer(Class<?> clazz) throws Exception {
 		if (clazz == null) {
