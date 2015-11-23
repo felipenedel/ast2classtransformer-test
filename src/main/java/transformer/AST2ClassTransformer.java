@@ -82,50 +82,59 @@ public class AST2ClassTransformer {
 			TypeElement typeElement = (TypeElement) element;
 
 			try {
-				String packageName = this.elementsUtil.getPackageOf(typeElement).toString();
-				this.classPool.makePackage(this.customClassLoader, packageName);
-				String elementClassName = typeElement.getSimpleName().toString();
-
-				CtClass ctClass;
+				this.classPool.get(element.toString());
+				createdClasses.add(this.customClassLoader.loadClass(element.toString()));
+			} catch (NotFoundException nfe) {
 				try {
-					ctClass = this.classPool.get(packageName + "." + elementClassName);
-					ctClass.defrost();
-				} catch (Exception e) {
-					ctClass = this.classPool.makeClass(packageName + "." + elementClassName);
-				}
+					// Just
 
-				ClassFile classfile = ctClass.getClassFile();
-				this.constantPool = classfile.getConstPool();
+					String packageName = this.elementsUtil.getPackageOf(typeElement).toString();
+					this.classPool.makePackage(this.customClassLoader, packageName);
+					String elementClassName = typeElement.getSimpleName().toString();
 
-				for (VariableElement elementField : ElementFilter.fieldsIn(typeElement.getEnclosedElements())) {
-					CtField ctField = this.resolveCtField(ctClass, elementField.asType().toString(), elementField.getSimpleName().toString());
-
-					if (ctField == null) {
-						continue;
+					CtClass ctClass;
+					try {
+						ctClass = this.classPool.get(packageName + "." + elementClassName);
+						ctClass.defrost();
+					} catch (Exception e) {
+						ctClass = this.classPool.makeClass(packageName + "." + elementClassName);
 					}
 
-					ctField.setModifiers(Modifier.PUBLIC);
+					ClassFile classfile = ctClass.getClassFile();
+					this.constantPool = classfile.getConstPool();
 
-					List<? extends AnnotationMirror> annotationMirrors = this.elementsUtil.getAllAnnotationMirrors(elementField);
-					for (AnnotationMirror annotationMirror : annotationMirrors) {
-						AttributeInfo annotationsAttribute = this.extractAnnotationFromMirror(annotationMirror);
+					for (VariableElement elementField : ElementFilter.fieldsIn(typeElement.getEnclosedElements())) {
+						CtField ctField = this.resolveCtField(ctClass, elementField.asType().toString(), elementField.getSimpleName().toString());
 
-						if (annotationsAttribute != null) {
-							ctField.getFieldInfo().addAttribute(annotationsAttribute);
+						if (ctField == null) {
+							continue;
 						}
+
+						ctField.setModifiers(Modifier.PUBLIC);
+
+						List<? extends AnnotationMirror> annotationMirrors = this.elementsUtil.getAllAnnotationMirrors(elementField);
+						for (AnnotationMirror annotationMirror : annotationMirrors) {
+							AttributeInfo annotationsAttribute = this.extractAnnotationFromMirror(annotationMirror);
+
+							if (annotationsAttribute != null) {
+								ctField.getFieldInfo().addAttribute(annotationsAttribute);
+							}
+						}
+
+						ctClass.addField(ctField);
 					}
 
-					ctClass.addField(ctField);
+					Class<?> createdClass = ctClass.toClass(this.customClassLoader, null);
+					createdClasses.add(createdClass);
+
+					// this.printClassFields(createdClass);
+				} catch (CannotCompileException e) {
+					log.warn("Cannot compile type element: " + typeElement.toString() + "\n" + e.getMessage());
+				} catch (NotFoundException e) {
+					log.warn("Not found: " + typeElement.toString() + "\n" + e.getMessage());
 				}
-
-				Class<?> createdClass = ctClass.toClass(this.customClassLoader, null);
-				createdClasses.add(createdClass);
-
-				// this.printClassFields(createdClass);
-			} catch (CannotCompileException e) {
-				log.warn("Cannot compile type element: " + typeElement.toString() + "\n" + e.getMessage());
-			} catch (NotFoundException e) {
-				log.warn("Not found: " + typeElement.toString() + "\n" + e.getMessage());
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
 			}
 		}
 

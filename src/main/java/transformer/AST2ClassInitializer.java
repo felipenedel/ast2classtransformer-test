@@ -3,12 +3,9 @@ package transformer;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
 import java.util.List;
 
-import javassist.CannotCompileException;
 import javassist.ClassPool;
-import javassist.CtClass;
 import javassist.NotFoundException;
 
 import org.slf4j.Logger;
@@ -21,37 +18,21 @@ public class AST2ClassInitializer {
 
 	private static final Logger log = LoggerFactory.getLogger(AST2ClassInitializer.class);
 
-	public ClassPool initializeClassPool(List<Class<?>> classes) {
+	public ClassPool initializeClassPool(List<URL> urls) {
 		ClassPool classPool = ClassPool.getDefault();
 
-		for (Class<?> clazz : classes) {
+		for (URL url : urls) {
 			try {
-				classPool.get(clazz.getName());
-			} catch (NotFoundException notFoundException) {
-				CtClass ctAnnotation = classPool.makeAnnotation(clazz.getName());
-				try {
-					ctAnnotation.toClass();
-				} catch (CannotCompileException e) {
-					log.error("Cannot compile: " + e.getMessage());
-				}
+				classPool.insertClassPath(url.getPath());
+			} catch (NotFoundException e) {
+				e.printStackTrace();
 			}
 		}
 
 		return classPool;
 	}
 
-	public ClassLoader initializeClassLoader(List<Class<?>> classes) {
-		List<URL> urls = new ArrayList<>();
-
-		for (Class<?> clazz : classes) {
-			try {
-				URL classContainer = ClassURLGetter.getClassContainer(clazz);
-				urls.add(classContainer);
-			} catch (Exception e) {
-				log.error(e.getMessage());
-			}
-		}
-
+	public ClassLoader initializeClassLoader(List<URL> urls) {
 		return this.addURLsToClassLoader(urls);
 	}
 
