@@ -8,12 +8,13 @@ public class ClassURLGetter {
 
 	// TODO Refact code;
 	// TODO Javadoc;
-	// TODO new line expect Sonar to get this error;
-	public static int i;
+	private int i;
 
 	public static URL getClassContainer(Class<?> clazz) throws Exception {
+		i = 0;
+
 		if (clazz == null) {
-			throw new NullPointerException("Cant't parse null Class");
+			throw new NullPointerException("Cant't parse null Class" + i);
 		}
 
         // TODO sout;
