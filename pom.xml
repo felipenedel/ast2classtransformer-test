@@ -135,7 +135,7 @@
                         <extension>transformer.TypeScriptMavenPropertiesExtension</extension>
                     </extensions>
                     <outputFileType>implementationFile</outputFileType>
-                    <outputFile>${project.parent.basedir}/ast2classtransformer-test/src/backend.ts</outputFile>
+                    <outputFile>backend.ts</outputFile>
                     <sortDeclarations>true</sortDeclarations>
                     <sortTypeDeclarations>true</sortTypeDeclarations>
                 </configuration>
