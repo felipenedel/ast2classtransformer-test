@@ -7,4 +7,4 @@ export interface ArquivoDto {
 
 // Added by 'TypeScriptMavenPropertiesExtension' extension
 
-export const PROJECT_VERSION = '1.1-SNAPSHOT'
+export const PROJECT_VERSION = '1.1'
