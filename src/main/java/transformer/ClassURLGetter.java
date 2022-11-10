@@ -18,9 +18,9 @@ public class ClassURLGetter {
         int a = 1;
         
         if (true) {
-                // TODO asdasdas;
+                // TODO dasdasdasdsa;
         }
-
+// new comment here
 		try {
 			while (clazz.isMemberClass() || clazz.isAnonymousClass()) {
 				clazz = clazz.getEnclosingClass();
