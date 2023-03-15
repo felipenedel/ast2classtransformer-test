@@ -14,6 +14,13 @@ public class ClassURLGetter {
 			throw new NullPointerException("Cant't parse null Class");
 		}
 
+        // TODO sout;
+        int a = 1;
+        
+        if (true) {
+                // TODO dasdasdasdsa;
+        }
+// new comment here
 		try {
 			while (clazz.isMemberClass() || clazz.isAnonymousClass()) {
 				clazz = clazz.getEnclosingClass();
