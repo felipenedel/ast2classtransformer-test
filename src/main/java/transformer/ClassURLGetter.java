@@ -8,6 +8,8 @@ public class ClassURLGetter {
 
 	// TODO Refact code;
 	// TODO Javadoc;
+	// TODO new line expect Sonar to get this error;
+	public static int i;
 
 	public static URL getClassContainer(Class<?> clazz) throws Exception {
 		if (clazz == null) {
